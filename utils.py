@@ -35,17 +35,19 @@ def get_sunday_date():
     return sunday.isoformat()[:10]
 
 
+@st.cache_data
 def get_data(url, sunday):
     data = pd.read_csv(url)
     data = data.set_index(keys="Country/Region").drop(
         columns=["Province/State", "Lat", "Long"]
     )
     data.columns = pd.to_datetime(data.columns)
-    wafr_data = data.loc[wafr_countries.keys()].loc[:, "2020-03-01" : sunday()]
+    last_date = min(pd.Timestamp(sunday()), data.columns.max())
+    wafr_data = data.loc[wafr_countries.keys()].loc[:, "2020-03-01":last_date]
     return wafr_data
 
 
-@st.cache
+@st.cache_data
 def prepare_data_day(wafr_data):
     wafr_data = wafr_data.sum()
     wafr_data = (wafr_data - wafr_data.shift(1)).fillna(0)
@@ -53,7 +55,7 @@ def prepare_data_day(wafr_data):
     return wafr_data
 
 
-@st.cache
+@st.cache_data
 def get_last_n_days_data(df, n=50, forecast=None):
     df = df.iloc[-n:].reset_index()
     df.columns = ["date", "deaths"]
@@ -68,11 +70,11 @@ def get_last_n_days_data(df, n=50, forecast=None):
     join = df.iloc[-1].copy()
     join["kind"] = "forecast"
 
-    df = df.append(join).append(forecast, ignore_index=True)
+    df = pd.concat([df, join.to_frame().T, forecast], ignore_index=True)
     return df
 
 
-@st.cache
+@st.cache_data
 def make_forecast(df):
     model = ARIMA(df, order=ARIMA_ORDER).fit()
     forecast = model.forecast(DAYS)
@@ -81,57 +83,30 @@ def make_forecast(df):
     return forecast
 
 
-# def altair_plot(base, fields):
-#     highlight = alt.selection(
-#         type="single", on="mouseover", fields=fields, nearest=True
-#     )
-
-#     points = (
-#         base.mark_circle()
-#         .encode(opacity=alt.value(0))
-#         .add_selection(highlight)
-#         .properties(width=600)
-#     )
-
-#     lines = base.mark_line().encode(
-#         size=alt.condition(~highlight, alt.value(1), alt.value(3))
-#     )
-
-#     chart = points + lines
-#     return st.altair_chart(chart, use_container_width=True)
-
-
 def altair_plot(df, x, y, color):
     line = alt.Chart(df).mark_line().encode(x=x, y=y, color=color)
 
-    # Create a selection that chooses the nearest point & selects based on x-value
-    nearest = alt.selection(
-        type="single", nearest=True, on="mouseover", fields=[x[:-2]], empty="none"
+    nearest = alt.selection_point(
+        nearest=True, on="mouseover", fields=[x[:-2]], empty=False
     )
 
-    # Transparent selectors across the chart. This is what tells us
-    # the x-value of the cursor
     selectors = (
         alt.Chart(df)
         .mark_point()
-        .encode(x=x, opacity=alt.value(0),)
-        .add_selection(nearest)
+        .encode(x=x, opacity=alt.value(0))
+        .add_params(nearest)
     )
 
-    # Draw points on the line, and highlight based on selection
     points = line.mark_point().encode(
         opacity=alt.condition(nearest, alt.value(1), alt.value(0))
     )
 
-    # Draw text labels near the points, and highlight based on selection
     text = line.mark_text(align="left", dx=5, dy=-5).encode(
         text=alt.condition(nearest, y, alt.value(" "))
     )
 
-    # Draw a rule at the location of the selection
-    rules = alt.Chart(df).mark_rule(color="gray").encode(x=x,).transform_filter(nearest)
+    rules = alt.Chart(df).mark_rule(color="gray").encode(x=x).transform_filter(nearest)
 
-    # Put the five layers into a chart and bind the data
     chart = alt.layer(line, selectors, points, rules, text).properties(
         width=600, height=300
     )
