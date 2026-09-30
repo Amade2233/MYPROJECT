@@ -36,13 +36,13 @@ def get_sunday_date():
 
 
 @st.cache_data
-def get_data(url, sunday):
+def get_data(url, _sunday):
     data = pd.read_csv(url)
     data = data.set_index(keys="Country/Region").drop(
         columns=["Province/State", "Lat", "Long"]
     )
     data.columns = pd.to_datetime(data.columns)
-    last_date = min(pd.Timestamp(sunday()), data.columns.max())
+    last_date = min(pd.Timestamp(_sunday()), data.columns.max())
     wafr_data = data.loc[wafr_countries.keys()].loc[:, "2020-03-01":last_date]
     return wafr_data
 
