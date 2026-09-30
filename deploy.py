@@ -9,7 +9,11 @@ df_day = prepare_data_day(df).to_frame()
 forecast = make_forecast(df_day)
 prev_50 = get_last_n_days_data(df_day, forecast=forecast)
 
-st.title("Technological University of the Shannon: Midlands Midwest")
+st.title("Covid-19 Mortality Forecasting — West Africa")
+st.caption(
+    "MSc Data Analytics project · Technological University of the Shannon · "
+    "Source: Johns Hopkins CSSE (dataset ceased updating March 2023)"
+)
 
 bar = st.sidebar
 option = bar.selectbox(
@@ -17,19 +21,15 @@ option = bar.selectbox(
 )
 
 if option == "7-day death cases forecast":
-    sunday = get_sunday_date()
-    next_sunday = (dt.fromisoformat(sunday) + timedelta(days=7)).isoformat()[:10]
     st.write("## A week forecast of death cases in West Africa")
-    st.write(f"__from {sunday} to {next_sunday}__")
-    st.write("__updated every sunday__")
+    st.write("__ARIMA(1,1,3) forecast from the end of the available series__")
 
     plot_forecast(prev_50)
     st.write("you can zoom in on chart; double click to reset chart")
     st.write(f"### Total deaths forecast for the week is {forecast.sum()}")
 
 if option == "death cases in West Africa":
-    st.write(f"## Covid-19 death trend in West Africa by country")
-    st.write("__updated every sunday__")
+    st.write("## Covid-19 death trend in West Africa by country")
     countries = st.multiselect(
         "Choose countries", ["All"] + list(df.index), ["Nigeria", "Ghana"]
     )
